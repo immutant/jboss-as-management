@@ -37,8 +37,6 @@
   [name]
   (api :operation "remove" :address ["deployment" name]))
 
-(def undeploy remove)
-
 (defn deploy
   "Tell the AS at *api-endpoint* to deploy the content added under name"
   [name]
