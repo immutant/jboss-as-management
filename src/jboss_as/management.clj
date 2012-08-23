@@ -1,4 +1,5 @@
 (ns jboss-as.management
+  (:refer-clojure :exclude [remove])
   (:require [clojure.data.json :as json]
             [clj-http.client :as client]))
 
