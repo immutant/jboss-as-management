@@ -5,4 +5,5 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/data.json "0.1.1"]
-                 [clj-http "0.2.7"]])
+                 [clj-http "0.2.7"]]
+  :lein-release {:deploy-via :clojars})
