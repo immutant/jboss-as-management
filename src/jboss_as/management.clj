@@ -13,7 +13,8 @@
         response (client/post *api-endpoint* {:body body
                                               :headers {"Content-Type" "application/json"}
                                               :throw-exceptions false})]
-    (json/read-json (response :body))))
+    (if-let [body (:body response)]
+      (json/read-json body))))
 
 (defn ready?
   "Returns true if JBoss is ready for action"
