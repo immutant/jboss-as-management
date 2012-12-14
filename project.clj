@@ -1,4 +1,4 @@
-(defproject jboss-as-management "0.1.3-SNAPSHOT"
+(defproject jboss-as-management "0.2.0-SNAPSHOT"
   :description "A thin wrapper around the JBoss AS7 management API."
   :url "https://github.com/immutant/jboss-as-management"
   :license {:name "Eclipse Public License"
