@@ -1,7 +1,7 @@
 (ns jboss-as.management
   (:refer-clojure :exclude [remove])
-  (:require [clojure.data.json :as json]
-            [clj-http.client :as client]))
+  (:require [clojure.data.json    :as json]
+            [clj-http.lite.client :as client]))
 
 (def ^{:dynamic true} *api-endpoint* "http://localhost:9990/management")
 
@@ -9,12 +9,12 @@
   "Params assembled into a hash that is passed to the JBoss management interface as a
    request to *api-endpoint* and returns the JBoss response as a hash"
   [& params]
-  (let [body (json/json-str (apply hash-map params))
+  (let [body (json/write-str (apply hash-map params))
         response (client/post *api-endpoint* {:body body
                                               :headers {"Content-Type" "application/json"}
                                               :throw-exceptions false})]
     (if-let [body (:body response)]
-      (json/read-json body))))
+      (json/read-str body :key-fn keyword))))
 
 (defn ready?
   "Returns true if JBoss is ready for action"
