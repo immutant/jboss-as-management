@@ -4,9 +4,6 @@
             [clj-http.lite.client :as client]
             [jboss-as.command     :as cmd]))
 
-;;; We assume the default management-http port
-(def port 9990)
-
 (defprotocol Server
   "Things you can do to a JBoss server"
   (start [_] "Start the server")
@@ -23,7 +20,7 @@
   "Returns an appropriate implementation of Server"
   [& {:keys [domain offset jboss-home base-dir debug]
       :or {offset 0} :as opts}]
-  (let [uri (format "http://localhost:%d/management" (+ port offset))]
+  (let [uri (format "http://localhost:%d/management" (+ cmd/mgmt-port offset))]
     (if domain
       (->Domain uri (cmd/domain opts))
       (->Standalone uri (cmd/standalone opts)))))
@@ -80,5 +77,57 @@
   (undeploy [this name]
     (api (.uri this), :operation "remove" :address ["deployment" name])))
 
+(defn host-controller [uri]
+  (-> (api uri,
+           :operation "read-children-resources",
+           :child-type "host")
+      :result
+      first))
+
+(defn server-group [uri]
+  (-> (api uri,
+           :operation "read-children-names"
+           :child-type "server-group")
+      :result
+      first))
+
 (extend-type Domain
-  Server)
+  Server
+  (start [this]
+    (if (ready? this)
+      (throw (Exception. "JBoss is already running!")))
+    (println (.command this))
+    (future (apply shell/sh (.split (.command this) " +"))))
+  (stop [this]
+    (api (.uri this),
+         :operation "shutdown"
+         :address [:host (first (host-controller (.uri this)))]))
+  (ready? [this]
+    (try
+      (> (-> (host-controller (.uri this)) last :server count) 1)
+      (catch Exception _)))
+  (add [this name content-uri]
+    (let [uri (.uri this)
+          group (server-group uri)]
+      (api (.uri this),
+           :operation "add"
+           :address ["deployment" name]
+           :content [{:url (.toExternalForm content-uri)}])
+      (api (.uri this),
+           :operation "add"
+           :address [{:server-group group} {:deployment name}]
+           :content [{:url (.toExternalForm content-uri)}])))
+  (deploy [this name]
+    (let [uri (.uri this)
+          group (server-group uri)
+          result (api uri,
+                      :operation "deploy"
+                      :address [{:server-group group} {:deployment name}])]
+      (if (= "success" (:outcome result))
+        result
+        (throw (Exception. (str result))))))
+  (undeploy [this name]
+    (let [uri (.uri this)
+          group (server-group uri)]
+      (api uri, :operation "remove" :address [{:server-group group} {:deployment name}])
+      (api uri, :operation "remove" :address ["deployment" name]))))

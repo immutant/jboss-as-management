@@ -2,6 +2,9 @@
   (:require [clojure.string :as str]
             [clojure.java.io :as io]))
 
+;;; We assume the default management-http port
+(def mgmt-port 9990)
+
 (defn jvm-options []
   ["-Xms64m"
    "-Xmx1024m"
@@ -47,21 +50,36 @@
 (defn domain
   [{:keys [jboss-home base-dir debug offset] :or {offset 0}}]
   (let [java-home (System/getProperty "java.home")
-        base-dir (or base-dir (io/file jboss-home "standalone"))]
+        base-dir (or base-dir (io/file jboss-home "domain"))]
     (->> (concat
           (cons (str java-home "/bin/java")
-                (jvm-options))
+                (cons "-D[ProcessController]" (jvm-options)))
           [(debug-opt debug)
+           (sysprop "jboss.domain.default.config" "domain.xml")
+           (sysprop "jboss.host.default.config" "host.xml")
            (sysprop "jboss.home.dir" jboss-home)
-           (sysprop "logging.configuration"
-                    (format "file:%s/standalone/configuration/logging.properties" jboss-home))
            (sysprop "org.jboss.boot.log.file"
-                    (format "%s/log/boot.log" base-dir))
+                    (format "%s/log/process-controller.log" base-dir))
+           (sysprop "logging.configuration"
+                    (format "file:%s/domain/configuration/logging.properties" jboss-home))
            (format "-jar %s/jboss-modules.jar" jboss-home)
            (format "-mp %s/modules" jboss-home)
-           "-jaxpmodule javax.xml.jaxp-provider"
-           "org.jboss.as.standalone"
-           (sysprop "jboss.server.base.dir" base-dir)
-           (sysprop "jboss.socket.binding.port-offset" offset)])
+           (format "org.jboss.as.process-controller -jboss-home %s" jboss-home)
+           (format "-jvm %s/bin/java" java-home)
+           (format "-mp %s/modules" jboss-home)
+           "--"
+           (sysprop "org.jboss.boot.log.file"
+                    (format "%s/log/host-controller.log" base-dir))
+           (sysprop "logging.configuration"
+                    (format "file:%s/domain/configuration/logging.properties" jboss-home))]
+          (jvm-options)
+          [(sysprop "jboss.domain.default.config" "domain.xml")
+           (sysprop "jboss.host.default.config" "host.xml")
+           "--"
+           (format "-default-jvm %s/bin/java" java-home)
+           (sysprop "jboss.domain.base.dir" base-dir)
+           (sysprop "jboss.socket.binding.port-offset" offset)
+           (sysprop "jboss.management.http.port" (+ mgmt-port offset))
+           ])
          (str/join " "))))
 
