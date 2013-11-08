@@ -1,9 +1,7 @@
 (ns jboss-as.command
   (:require [clojure.string :as str]
-            [clojure.java.io :as io]))
-
-;;; We assume the default management-http port
-(def mgmt-port 9990)
+            [clojure.java.io :as io])
+  (:use [jboss-as.api :only (port)]))
 
 (defn jvm-options []
   ["-Xms64m"
@@ -79,7 +77,7 @@
            (format "-default-jvm %s/bin/java" java-home)
            (sysprop "jboss.domain.base.dir" base-dir)
            (sysprop "jboss.socket.binding.port-offset" offset)
-           (sysprop "jboss.management.http.port" (+ mgmt-port offset))
+           (sysprop "jboss.management.http.port" (+ port offset))
            ])
          (str/join " "))))
 
