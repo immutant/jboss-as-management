@@ -26,83 +26,96 @@
       (->Standalone uri (cmd/standalone opts)))))
 
 (def common
-  {:start     (fn [this]
-                (if (ready? this)
-                  (throw (Exception. "JBoss is already running!")))
-                (println (.command this))
-                (future (apply shell/sh (.split (.command this) " +"))))
-   :deployed? (fn [this name]
-                (->> (request (.uri this)
-                              :operation "read-children-names"
-                              :child-type "deployment")
-                     :result
-                     (some #{name})
-                     boolean))})
+  "Base functionality in common with both Standalone and Domain"
+  {:start
+   (fn [this]
+     (if (ready? this)
+       (throw (Exception. "JBoss is already running!")))
+     (println (.command this))
+     (future (apply shell/sh (.split (.command this) " +"))))
+   :deployed?
+   (fn [this name]
+     (->> (request (.uri this)
+                   :operation "read-children-names"
+                   :child-type "deployment")
+          :result
+          (some #{name})
+          boolean))})
 
 (def standalone
-  {:stop     (fn [this]
-               (request (.uri this), :operation "shutdown"))
-   :ready?   (fn [this]
-               (try (let [response (request (.uri this)
-                                            :operation "read-attribute"
-                                            :name "server-state")]
-                      (and response
-                           (= "success" (response :outcome))
-                           (= "running" (response :result))))
-                    (catch Exception _)))
-   :deploy   (fn [this name content-uri]
-               (if (deployed? this name) (undeploy this name))
-               (request (.uri this),
-                        :operation "add"
-                        :address ["deployment" name]
-                        :content [{:url (.toExternalForm content-uri)}])
-               (let [result (request (.uri this),
-                                     :operation "deploy"
-                                     :address ["deployment" name])]
-                 (if (= "success" (:outcome result))
-                   result
-                   (throw (Exception. (str result))))))
-   :undeploy (fn [this name]
-               (request (.uri this),
-                        :operation "remove"
-                        :address ["deployment" name]))})
+  "Server impls for Standalone mode"
+  {:stop
+   (fn [this]
+     (request (.uri this), :operation "shutdown"))
+   :ready?
+   (fn [this]
+     (try (let [response (request (.uri this)
+                                  :operation "read-attribute"
+                                  :name "server-state")]
+            (and response
+                 (= "success" (response :outcome))
+                 (= "running" (response :result))))
+          (catch Exception _)))
+   :deploy
+   (fn [this name content-uri]
+     (if (deployed? this name) (undeploy this name))
+     (request (.uri this),
+              :operation "add"
+              :address ["deployment" name]
+              :content [{:url (.toExternalForm content-uri)}])
+     (let [result (request (.uri this),
+                           :operation "deploy"
+                           :address ["deployment" name])]
+       (if (= "success" (:outcome result))
+         result
+         (throw (Exception. (str result))))))
+   :undeploy
+   (fn [this name]
+     (request (.uri this),
+              :operation "remove"
+              :address ["deployment" name]))})
 
 (def domain
-  {:stop     (fn [this]
-               (request (.uri this),
-                        :operation "shutdown"
-                        :address [:host (first (host-controller (.uri this)))]))
-   :ready?   (fn [this]
-               (try
-                 (> (-> (host-controller (.uri this)) last :server count) 1)
-                 (catch Exception _)))
-   :deploy   (fn [this name content-uri]
-               (if (deployed? this name) (undeploy this name))
-               (let [uri (.uri this)
-                     group (server-group uri)]
-                 (request (.uri this),
-                          :operation "add"
-                          :address ["deployment" name]
-                          :content [{:url (.toExternalForm content-uri)}])
-                 (request (.uri this),
-                          :operation "add"
-                          :address [{:server-group group} {:deployment name}]
-                          :content [{:url (.toExternalForm content-uri)}])
-                 (let [result (request uri,
-                                       :operation "deploy"
-                                       :address [{:server-group group} {:deployment name}])]
-                   (if (= "success" (:outcome result))
-                     result
-                     (throw (Exception. (str result)))))))
-   :undeploy (fn [this name]
-               (let [uri (.uri this)
-                     group (server-group uri)]
-                 (request uri,
-                          :operation "remove"
-                          :address [{:server-group group} {:deployment name}])
-                 (request uri,
-                          :operation "remove"
-                          :address ["deployment" name])))})
+  "Server impls for Domain mode"
+  {:stop
+   (fn [this]
+     (request (.uri this),
+              :operation "shutdown"
+              :address [:host (first (host-controller (.uri this)))]))
+   :ready?
+   (fn [this]
+     (try
+       (> (-> (host-controller (.uri this)) last :server count) 1)
+       (catch Exception _)))
+   :deploy
+   (fn [this name content-uri]
+     (if (deployed? this name) (undeploy this name))
+     (let [uri (.uri this)
+           group (server-group uri)]
+       (request (.uri this),
+                :operation "add"
+                :address ["deployment" name]
+                :content [{:url (.toExternalForm content-uri)}])
+       (request (.uri this),
+                :operation "add"
+                :address [{:server-group group} {:deployment name}]
+                :content [{:url (.toExternalForm content-uri)}])
+       (let [result (request uri,
+                             :operation "deploy"
+                             :address [{:server-group group} {:deployment name}])]
+         (if (= "success" (:outcome result))
+           result
+           (throw (Exception. (str result)))))))
+   :undeploy
+   (fn [this name]
+     (let [uri (.uri this)
+           group (server-group uri)]
+       (request uri,
+                :operation "remove"
+                :address [{:server-group group} {:deployment name}])
+       (request uri,
+                :operation "remove"
+                :address ["deployment" name])))})
 
 (extend Standalone
   Server
