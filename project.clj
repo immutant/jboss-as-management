@@ -6,4 +6,5 @@
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [org.clojure/data.json "0.2.1"]
                  [clj-http-lite         "0.2.0"]]
+  :signing {:gpg-key "BFC757F9"}
   :lein-release {:deploy-via :clojars})
