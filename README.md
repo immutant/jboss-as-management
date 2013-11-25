@@ -14,26 +14,25 @@ connect to whatever endpoint that `*api-endpoint*` is bound to, which is
 Examples:
 
     (require '[jboss-as.management :as mgt])
-    
+
+    ;;server representation
+    (def server (mgt/create-server))
+
     ;; see if the server is up
-    (mgt/ready?)
-    
-    ;; add deployment content
-    (mgt/add "my-deployment" (.toUrl some-descriptor-file))
+    (mgt/ready? server)
 
-    ;; deploy the added content
-    (mgt/deploy "my-deployment")
+    ;; deploy the content of some-descriptor-file
+    (mgt/deploy server "my-deployment" (.toUrl some-descriptor-file))
 
-    ;; remove (undeploy) the deployment
-    (mgt/remove "my-deployment")
+    ;; check whether my-deployment is deployed
+    (mgt/deployed? server "my-deployment")
+
+    ;; undeploy the deployment
+    (mgt/undeploy server "my-deployment")
 
     ;; shut it down, shut it down now
-    (mgt/shutdown)
-    
-    ;; talk to a different endpoint
-    (binding [mgt/*api-endpoint* "http://somewhere:9990/management"]
-      (mgt/ready?))
-      
+    (mgt/stop server)
+
 ## License
 
 Copyright © 2012 Red Hat, Inc.
