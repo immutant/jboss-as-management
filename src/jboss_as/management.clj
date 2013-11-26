@@ -25,6 +25,26 @@
       (->Domain uri (cmd/domain opts))
       (->Standalone uri (cmd/standalone opts)))))
 
+(defn wait-for-ready?
+  "Returns true if the server is up. Otherwise, sleeps for one second
+   and then retries, effectively blocking the current thread until the
+   server becomes ready or 'attempts' number of seconds has elapsed"
+  ([server]
+     (wait-for-ready? server 30))
+  ([server attempts]
+     (or (ready? server)
+       (when (> attempts 0)
+         (Thread/sleep 1000)
+         (recur server (dec attempts))))))
+
+(def port
+  "Resolve port from server's offset. Argument may either be a number
+   like 8080, or a keyword like :http. The optional host-name only
+   applies to a Domain server."
+  (memoize
+    (fn [server port & [host-name]]
+      (api/resolve-port (.uri server) port host-name))))
+
 (def common
   "Base functionality in common with both Standalone and Domain"
   {:start
@@ -124,23 +144,3 @@
 (extend Domain
   Server
   (merge common domain))
-
-(defn wait-for-ready?
-  "Returns true if the server is up. Otherwise, sleeps for one second
-   and then retries, effectively blocking the current thread until the
-   server becomes ready or 'attempts' number of seconds has elapsed"
-  ([server]
-     (wait-for-ready? server 30))
-  ([server attempts]
-     (or (ready? server)
-       (when (> attempts 0)
-         (Thread/sleep 1000)
-         (recur server (dec attempts))))))
-
-(def port
-  "Resolve port from server's offset. Argument may either be a number
-   like 8080, or a keyword like :http. The optional host-name only
-   applies to a Domain server."
-  (memoize
-    (fn [server port & [host-name]]
-      (api/resolve-port (.uri server) port host-name))))

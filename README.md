@@ -7,30 +7,32 @@ A Clojure wrapper around the JBoss AS7 "REST" management API.
 Right now, the support is fairly basic. You can check to see if the server is up,
 shut it down, add a deployment, deploy said deployment, or remove said deployment.
 
-You can also use the `api` function to call other management operations. It will
-connect to whatever endpoint that `*api-endpoint*` is bound to, which is 
-"http://localhost:9990/management" by default.
+You can use `jboss-as.api/request` to call other management
+operations. Pass it a URI like "http://localhost:9990/management".
 
 Examples:
 
     (require '[jboss-as.management :as mgt])
 
-    ;;server representation
-    (def server (mgt/create-server))
+    ;;; Create a server
+    (def server (mgt/create-server :jboss-home (System/getenv "JBOSS_HOME")))
 
-    ;; see if the server is up
-    (mgt/ready? server)
+    ;;; Start it up
+    (mgt/start server)
+    
+    ;;; Wait for it
+    (mgt/wait-for-ready? server)
 
-    ;; deploy the content of some-descriptor-file
-    (mgt/deploy server "my-deployment" (.toUrl some-descriptor-file))
+    ;;; Deploy an app
+    (mgt/deploy server "my-deployment.clj" (.toUrl some-descriptor-file))
 
-    ;; check whether my-deployment is deployed
-    (mgt/deployed? server "my-deployment")
+    ;;; See if it's deployed
+    (mgt/deployed? server "my-deployment.clj")
 
-    ;; undeploy the deployment
-    (mgt/undeploy server "my-deployment")
+    ;;; Undeploy it
+    (mgt/undeploy server "my-deployment.clj")
 
-    ;; shut it down, shut it down now
+    ;;; Shutdown the server
     (mgt/stop server)
 
 ## License
