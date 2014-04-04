@@ -18,7 +18,7 @@
 
 (defn create-server
   "Returns an appropriate implementation of Server"
-  [& {:keys [domain offset jboss-home base-dir debug]
+  [& {:keys [domain offset]
       :or {offset 0} :as opts}]
   (let [uri (format "http://localhost:%d/management" (+ api/port offset))]
     (if domain
