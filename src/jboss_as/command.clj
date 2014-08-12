@@ -25,7 +25,7 @@
             (str default))))
 
 (defn standalone
-  [{:keys [jboss-home base-dir debug offset log-level] :or {offset 0 log-level :INFO}}]
+  [{:keys [jboss-home base-dir debug offset log-level config] :or {offset 0 log-level :INFO}}]
   (let [java-home (System/getProperty "java.home")
         base-dir (or base-dir (io/file jboss-home "standalone"))]
     (->> (concat
@@ -43,11 +43,12 @@
            "org.jboss.as.standalone"
            (sysprop "jboss.server.base.dir" base-dir)
            (sysprop "jboss.socket.binding.port-offset" offset)
-           (sysprop "jboss.logging.level" (name log-level))])
+           (sysprop "jboss.logging.level" (name log-level))
+           "-c" config])
          (str/join " "))))
 
 (defn domain
-  [{:keys [jboss-home base-dir debug offset log-level] :or {offset 0 log-level :INFO}}]
+  [{:keys [jboss-home base-dir debug offset log-level config] :or {offset 0 log-level :INFO}}]
   (let [java-home (System/getProperty "java.home")
         base-dir (or base-dir (io/file jboss-home "domain"))]
     (->> (concat
@@ -79,6 +80,8 @@
            (sysprop "jboss.domain.base.dir" base-dir)
            (sysprop "jboss.socket.binding.port-offset" offset)
            (sysprop "jboss.management.http.port" (+ port offset))
-           (sysprop "jboss.logging.level" (name log-level))])
+           (sysprop "jboss.logging.level" (name log-level))]
+          (if config
+            ["-c" config]
+            []))
          (str/join " "))))
-

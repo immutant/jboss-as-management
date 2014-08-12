@@ -1,11 +1,17 @@
 (ns jboss-as.management
-  (:require [clojure.java.shell   :as shell]
-            [jboss-as.command     :as cmd]
-            [jboss-as.api         :as api]))
+  (:require [clojure.java.shell :as shell]
+            [clojure.java.io    :as io]
+            [jboss-as.command   :as cmd]
+            [jboss-as.api       :as api]))
 
 (defprotocol Server
   "Things you can do to a JBoss server. Names should always have a
    valid suffix, e.g. clj, ima, war"
+  (alter-config! [_ f] [_ f file]
+    "Applies f to the content of the config xml, and writes it back to
+     the file unless f returns nil. If file is provided, that file
+     from the configuration dir will be altered, otherwise the default
+     config will be altered.")
   (start [_] "Start the server")
   (stop [_] "Stop the server")
   (ready? [_] "Is the server up?")
@@ -13,8 +19,8 @@
   (deployed? [_ name] "Currently deployed?")
   (undeploy [_ name] "Undeploy by removing associated content"))
 
-(deftype Standalone [uri, command])
-(deftype Domain [uri, command])
+(defrecord Standalone [uri options cmd-fn])
+(defrecord Domain [uri options cmd-fn])
 
 (defn create-server
   "Returns an appropriate implementation of Server"
@@ -22,8 +28,8 @@
       :or {offset 0} :as opts}]
   (let [uri (format "http://localhost:%d/management" (+ api/port offset))]
     (if domain
-      (->Domain uri (cmd/domain opts))
-      (->Standalone uri (cmd/standalone opts)))))
+      (->Domain uri (merge {:config "domain.xml"} opts) cmd/domain)
+      (->Standalone uri (merge {:config "standalone-full.xml"} opts) cmd/standalone))))
 
 (defn wait-for-ready?
   "Returns true if the server is up. Otherwise, sleeps for one second
@@ -43,33 +49,45 @@
    applies to a Domain server."
   (memoize
     (fn [server port & [host-name]]
-      (api/resolve-port (.uri server) port host-name))))
+      (api/resolve-port (:uri server) port host-name))))
 
 (def common
   "Base functionality in common with both Standalone and Domain"
   {:start
-   (fn [this]
+   (fn [{:keys [cmd-fn options] :as this}]
      (if (ready? this)
        (throw (Exception. "JBoss is already running!")))
-     (println (.command this))
-     (future (apply shell/sh (.split (.command this) " +"))))
+     (let [cmd (cmd-fn options)]
+       (println cmd)
+       (future (apply shell/sh (.split cmd " +")))))
    :deployed?
-   (fn [this name]
-     (->> (api/request (.uri this)
+   (fn [{:keys [uri]} name]
+     (->> (api/request uri
             :operation "read-children-names"
             :child-type "deployment")
        :result
        (some #{name})
        boolean))})
 
+(defn alter-config*
+  ([prefix server f]
+     (alter-config* prefix server f nil))
+  ([prefix {:keys [options]} f file]
+     (let [file (io/file (:jboss-home options)
+                  prefix "configuration" (or file (:config options)))]
+       (when-let [result (f (slurp file))]
+         (spit file result)))))
+
 (def standalone
   "Server impls for Standalone mode"
-  {:stop
-   (fn [this]
-     (api/request (.uri this), :operation "shutdown"))
+  {:alter-config!
+   (partial alter-config* "standalone")
+   :stop
+   (fn [{:keys [uri]}]
+     (api/request uri :operation "shutdown"))
    :ready?
-   (fn [this]
-     (try (let [response (api/request (.uri this)
+   (fn [{:keys [uri]}]
+     (try (let [response (api/request uri
                            :operation "read-attribute"
                            :name "server-state")]
             (and response
@@ -77,59 +95,59 @@
               (= "running" (response :result))))
           (catch Exception _)))
    :deploy
-   (fn [this name content-uri]
+   (fn [{:keys [uri] :as this} name content-uri]
      (if (deployed? this name) (undeploy this name))
-     (api/request (.uri this),
+     (api/request uri
        :operation "add"
        :address [:deployment name]
        :content [{:url (.toExternalForm content-uri)}])
-     (let [result (api/request (.uri this),
+     (let [result (api/request uri
                     :operation "deploy"
                     :address [:deployment name])]
        (if (= "success" (:outcome result))
          result
          (throw (Exception. (str result))))))
    :undeploy
-   (fn [this name]
-     (api/request (.uri this),
+   (fn [{:keys [uri]} name]
+     (api/request uri
        :operation "remove"
        :address [:deployment name]))})
 
 (def domain
   "Server impls for Domain mode"
-  {:stop
-   (fn [this]
-     (api/request (.uri this),
+  {:alter-config!
+   (partial alter-config* "domain")
+   :stop
+   (fn [{:keys [uri]}]
+     (api/request uri
        :operation "shutdown"
-       :address [:host (:name (api/host-controller (.uri this)))]))
+       :address [:host (:name (api/host-controller uri))]))
    :ready?
-   (fn [this]
+   (fn [{:keys [uri]}]
      (try
-       (> (-> (api/host-controller (.uri this)) :server count) 1)
+       (> (-> (api/host-controller uri) :server count) 1)
        (catch Exception _)))
    :deploy
-   (fn [this name content-uri]
+   (fn [{:keys [uri] :as this} name content-uri]
      (if (deployed? this name) (undeploy this name))
-     (let [uri (.uri this)
-           group (api/server-group uri)]
-       (api/request (.uri this),
+     (let [group (api/server-group uri)]
+       (api/request uri
          :operation "add"
          :address [:deployment name]
          :content [{:url (.toExternalForm content-uri)}])
-       (api/request (.uri this),
+       (api/request uri
          :operation "add"
          :address [{:server-group group} {:deployment name}]
          :content [{:url (.toExternalForm content-uri)}])
-       (let [result (api/request uri,
+       (let [result (api/request uri
                       :operation "deploy"
                       :address [{:server-group group} {:deployment name}])]
          (if (= "success" (:outcome result))
            result
            (throw (Exception. (str result)))))))
    :undeploy
-   (fn [this name]
-     (let [uri (.uri this)
-           group (api/server-group uri)]
+   (fn [{:keys [uri]} name]
+     (let [group (api/server-group uri)]
        (api/request uri,
          :operation "remove"
          :address [{:server-group group} {:deployment name}])
