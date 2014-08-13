@@ -73,8 +73,11 @@
   ([prefix server f]
      (alter-config* prefix server f nil))
   ([prefix {:keys [options]} f file]
-     (let [file (io/file (:jboss-home options)
-                  prefix "configuration" (or file (:config options)))]
+     (let [dir (apply io/file
+                  (if-let [base-dir (:base-dir options)]
+                    [base-dir "configuration"]
+                    [(:jboss-home options) prefix "configuration"]))
+           file (io/file dir (or file (:config options)))]
        (when-let [result (f (slurp file))]
          (spit file result)))))
 
