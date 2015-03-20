@@ -17,6 +17,14 @@
     (if-let [body (:body response)]
       (json/read-str body :key-fn keyword))))
 
+(defn request-or-toss
+  "Throws an Exception if the request isn't successful"
+  [uri & params]
+  (let [result (apply request uri params)]
+    (if (= "success" (:outcome result))
+      result
+      (throw (Exception. (str result))))))
+
 (defn deep-merge
   "Recursively merges maps"
   [& vals]
@@ -68,10 +76,13 @@
     :status))
 
 (defn system-properties [uri]
-  (if-let [host (host-controller uri)]
-    (get-in host [:core-service :platform-mbean :type :runtime :system-properties])
-    (-> (request uri :operation "read-children-resources" :child-type "core-service" :recursive true)
-      :result :platform-mbean :type :runtime :system-properties)))
+  (let [host (host-controller uri)
+        addr (cond-> '({:core-service "platform-mbean"} {:type "runtime"})
+               host (conj {:host (:name host)}))]
+    (-> (request uri :operation "read-attribute",
+          :address addr
+          :name "system-properties")
+      :result)))
 
 (defn expand [val props]
   "Account for values like ${property:default}"

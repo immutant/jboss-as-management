@@ -23,7 +23,7 @@
     (alter-config! srv disable-management-security)
     (try
       (start srv)
-      (wait-for-ready? srv)
+      (is (wait-for-ready? srv))
       (is (= (+ 29 8080) (port srv :http)))
       (is (= (+ 29 8081) (port srv 8081)))
       (finally
@@ -39,7 +39,7 @@
     (alter-config! srv enable-port-offset "host.xml")
     (try
       (start srv)
-      (wait-for-ready? srv)
+      (is (wait-for-ready? srv))
       (is (= (+ 42 8080) (port srv :http "server-one")))
       (is (= (+ 42 8080) (port srv 8080 "server-one")))
       (is (= (+ 150 8080) (port srv :http "server-two")))

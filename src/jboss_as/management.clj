@@ -100,16 +100,13 @@
    :deploy
    (fn [{:keys [uri] :as this} name content-uri]
      (if (deployed? this name) (undeploy this name))
-     (api/request uri
+     (api/request-or-toss uri
        :operation "add"
        :address [:deployment name]
        :content [{:url (.toExternalForm content-uri)}])
-     (let [result (api/request uri
-                    :operation "deploy"
-                    :address [:deployment name])]
-       (if (= "success" (:outcome result))
-         result
-         (throw (Exception. (str result))))))
+     (api/request-or-toss uri
+       :operation "deploy"
+       :address [:deployment name]))
    :undeploy
    (fn [{:keys [uri]} name]
      (api/request uri
@@ -134,20 +131,17 @@
    (fn [{:keys [uri] :as this} name content-uri]
      (if (deployed? this name) (undeploy this name))
      (let [group (api/server-group uri)]
-       (api/request uri
+       (api/request-or-toss uri
          :operation "add"
          :address [:deployment name]
          :content [{:url (.toExternalForm content-uri)}])
-       (api/request uri
+       (api/request-or-toss uri
          :operation "add"
          :address [{:server-group group} {:deployment name}]
          :content [{:url (.toExternalForm content-uri)}])
-       (let [result (api/request uri
-                      :operation "deploy"
-                      :address [{:server-group group} {:deployment name}])]
-         (if (= "success" (:outcome result))
-           result
-           (throw (Exception. (str result)))))))
+       (api/request-or-toss uri
+         :operation "deploy"
+         :address [{:server-group group} {:deployment name}])))
    :undeploy
    (fn [{:keys [uri]} name]
      (let [group (api/server-group uri)]
