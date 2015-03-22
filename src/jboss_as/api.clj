@@ -25,27 +25,28 @@
       result
       (throw (Exception. (str result))))))
 
-(defn deep-merge
-  "Recursively merges maps"
-  [& vals]
-  (if (every? map? vals)
-    (apply merge-with deep-merge vals)
-    (last vals)))
-
 (defn host-controller [uri]
-  "We merge the results of a non-recursive call with a recursive one
-   to address a bug where the :server key is absent from the recursive
-   result"
-  (let [shallow (request uri,
-                  :operation "read-children-resources",
-                  :child-type "host"
-                  :recursive false)
-        deep (request uri,
-               :operation "read-children-resources",
-               :child-type "host"
-               :recursive true)
-        merged (deep-merge shallow deep)]
-    (-> merged :result vals first)))
+  (-> (request uri,
+        :operation "read-children-resources",
+        :child-type "host"
+        :recursive true)
+    :result vals first))
+
+(defn servers [uri]
+  (->> uri host-controller :server-config vals (filter :auto-start)))
+
+(defn server-started? [uri host server]
+  (let [response (request uri
+                   :operation "read-attribute"
+                   :name "server-state"
+                   :address [{:host host} {:server server}])]
+    (and
+      (= "success" (:outcome response))
+      (= "running" (:result response)))))
+
+(defn all-servers-started? [uri]
+  (every? (partial server-started? uri (:name (host-controller uri)))
+    (map :name (servers uri))))
 
 (defn server-group [uri]
   (-> (request uri,

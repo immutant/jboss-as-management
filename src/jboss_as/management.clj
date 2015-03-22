@@ -125,7 +125,7 @@
    :ready?
    (fn [{:keys [uri]}]
      (try
-       (> (-> (api/host-controller uri) :server count) 1)
+       (api/all-servers-started? uri)
        (catch Exception _)))
    :deploy
    (fn [{:keys [uri] :as this} name content-uri]
