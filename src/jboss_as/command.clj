@@ -80,7 +80,8 @@
            (sysprop "jboss.domain.base.dir" base-dir)
            (sysprop "jboss.socket.binding.port-offset" offset)
            (sysprop "jboss.management.http.port" (+ port offset))
-           (sysprop "jboss.logging.level" (name log-level))]
+           (sysprop "jboss.logging.level" (name log-level))
+           (sysprop "jboss.messaging.cluster.password" "passwordle")]
           (if config
             ["-c" config]
             []))
