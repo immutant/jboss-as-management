@@ -5,6 +5,11 @@
 ;;; We assume the default management-http port
 (def port 9990)
 
+(defn mark [& msg]
+  (let [ts (.format (java.text.SimpleDateFormat. "HH:mm:ss,SSS")
+                 (java.util.Date.))]
+    (apply println ts msg)))
+
 (defn request
   "Params assembled into a hash that is passed to the JBoss management
    interface via the passed URI and returns the JBoss response as a
@@ -14,8 +19,12 @@
         response (client/post uri {:body body
                                    :headers {"Content-Type" "application/json"}
                                    :throw-exceptions false})]
+    (mark "TC: api request" uri (apply hash-map params))
     (if-let [body (:body response)]
-      (json/read-str body :key-fn keyword))))
+      (let [data (json/read-str body :key-fn keyword)]
+        (mark "TC: api data" data)
+        data)
+      (mark "TC: api call returned nil"))))
 
 (defn request-or-toss
   "Throws an Exception if the request isn't successful"
