@@ -43,13 +43,19 @@
          (Thread/sleep 1000)
          (recur server (dec attempts))))))
 
-(def port
+(let [port* (memoize
+              (fn [server port & [host-name]]
+                (println (format "TC: (mgt/port %s %s %s) ; memoized" server port host-name))
+                (api/resolve-port (:uri server) port host-name)))]
+  (defn port
   "Resolve port from server's offset. Argument may either be a number
-   like 8080, or a keyword like :http. The optional host-name only
-   applies to a Domain server."
-  (memoize
-    (fn [server port & [host-name]]
-      (api/resolve-port (:uri server) port host-name))))
+  like 8080, or a keyword like :http. The optional host-name only
+  applies to a Domain server."
+  [server port & [host-name]]
+  (println (format "TC: (mgt/port %s %s %s) ; pre-memoized" server port host-name))
+  (let [v (port* server port host-name)]
+    (println "TC: memoized port is" v)
+    v)))
 
 (def common
   "Base functionality in common with both Standalone and Domain"

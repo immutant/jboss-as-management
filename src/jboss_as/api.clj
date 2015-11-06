@@ -10,21 +10,23 @@
                  (java.util.Date.))]
     (apply println ts msg)))
 
+(def ^:dynamic *log-request* false)
+
 (defn request
   "Params assembled into a hash that is passed to the JBoss management
    interface via the passed URI and returns the JBoss response as a
    clojure map"
   [uri & params]
+  (when *log-request* (mark (format "TC: (request %s %s)" uri (apply hash-map params))))
   (let [body (json/write-str (apply hash-map params))
         response (client/post uri {:body body
                                    :headers {"Content-Type" "application/json"}
                                    :throw-exceptions false})]
-    (mark "TC: api request" uri (apply hash-map params))
     (if-let [body (:body response)]
       (let [data (json/read-str body :key-fn keyword)]
-        (mark "TC: api data" data)
+        (when *log-request* (mark "TC: api data" data))
         data)
-      (mark "TC: api call returned nil"))))
+      (when *log-request* (mark "TC: api call returned nil")))))
 
 (defn request-or-toss
   "Throws an Exception if the request isn't successful"
@@ -111,6 +113,7 @@
   "Determine the port offset for either a single standalone server or
    one in a domain"
   [uri & [server-name]]
+  (mark (format "TC: (offset %s %s)" uri server-name))
   (let [server-name (keyword server-name)]
     (expand-to-number
       (if server-name
@@ -136,9 +139,11 @@
 
 (defn resolve-port
   [uri v & [host-name]]
-  (+ (offset uri host-name)
-    (if (number? v)
-      v
-      (expand-to-number
-        (:port (socket-binding uri v))
-        (system-properties uri)))))
+  (mark (format "TC: (resolve-port %s %s %s)" uri v host-name))
+  (binding [*log-request* true]
+    (+ (offset uri host-name)
+      (if (number? v)
+        v
+        (expand-to-number
+          (:port (socket-binding uri v))
+          (system-properties uri))))))
