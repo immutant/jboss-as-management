@@ -5,7 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :exclusions [org.clojure/clojure]
   :dependencies [[org.clojure/data.json "0.2.1"]
-                 [clj-http-lite         "0.2.0"]]
+                 [clj-http-lite         "0.3.0"]]
   :signing {:gpg-key "BFC757F9"}
   :deploy-repositories {"releases" :clojars}
   :profiles {:dev
